@@ -20,14 +20,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      # - name: Decode the secret and save it as a .pem file
-      #   run: echo "${{ secrets.CLIENT_SECRET }}" | base64 --decode > cert.pem
-
-      # - name: Login to Azure with the Service Principal
-      #   run: az login --service-principal -u ${{ secrets.CLIENT_ID }} --certificate cert.pem --tenant ${{ secrets.TENANT_ID }}
-
-      # - name: Check if the storage account exists
-      #   run: az storage account show --name azureworkshopdemostorage --resource-group azureworkshop-demo-rg
+      - name: Check if the storage account exists
+        run: az storage account show --name stdemodevwesteu001 --resource-group azureworkshop-demo-rg
 
   deploy:
     if: github.event.inputs.action == 'deploy'
@@ -52,7 +46,31 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
-   
+
+      - name: Generate VM Password
+        run: |
+          # Generate secure password meeting Azure requirements
+          PASSWORD=$(openssl rand -base64 16)
+          SPECIAL_CHAR='!@#$%^&*'
+          RANDOM_SPECIAL=${SPECIAL_CHAR:$((RANDOM % ${#SPECIAL_CHAR})):1}
+          VM_PASSWORD="${PASSWORD}${RANDOM_SPECIAL}Aa1"
+          
+          # Add password to tfvars file
+          echo "virtual_machine_admin_password = \"${VM_PASSWORD}\"" >> terraform.auto.tfvars
+      
+      - name: Update Terraform Variables
+        run: |
+          echo "subscription_id = \"${{ secrets.SUBSCRIPTION_ID }}\"" >> terraform.auto.tfvars
+      
+      - name: Create SSH Key File
+        run: |
+          
+          # Create public key file from secret
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+          
+          # Add the key path to tfvars
+          #echo "virtual_machine_ssh_key_path = \".ssh/id_rsa.pub\"" >> terraform.auto.tfvars
+          
       # - name: Configuration of Terraform for using the Client Certificate
       #   run: |
       #     echo "ARM_CLIENT_ID=${{ secrets.CLIENT_ID }}" >> $GITHUB_ENV
@@ -76,14 +94,14 @@ jobs:
       #     echo "TF_VAR_cognitive_deployment_sku_name=${{ vars.COGNITIVE_DEPLOYMENT_SKU_NAME }}" >> $GITHUB_ENV
       #     echo "TF_VAR_cognitive_deployment_sku_capacity=${{ vars.COGNITIVE_DEPLOYMENT_SKU_CAPACITY }}" >> $GITHUB_ENV
 
-      # - name: Terraform Initialize 
-      #   run: terraform init
+      - name: Terraform Initialize 
+        run: terraform init
 
-      # - name: Terraform Validate
-      #   run: terraform validate
+      - name: Terraform Validate
+        run: terraform validate
 
-      # - name: Terraform Plan
-      #   run: terraform plan -out=tfplan
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
 
       # - name: Terraform Apply
       #   run: terraform apply -auto-approve tfplan
