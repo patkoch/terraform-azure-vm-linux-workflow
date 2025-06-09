@@ -124,29 +124,29 @@ jobs:
       - name: Terraform Initialize 
         run: terraform init
       
-      # - name: Generate VM Password
-      #   run: |
-      #     # Generate secure password meeting Azure requirements
-      #     PASSWORD=$(openssl rand -base64 16)
-      #     SPECIAL_CHAR='!@#$%^&*'
-      #     RANDOM_SPECIAL=${SPECIAL_CHAR:$((RANDOM % ${#SPECIAL_CHAR})):1}
-      #     VM_PASSWORD="${PASSWORD}${RANDOM_SPECIAL}Aa1"
+      - name: Generate VM Password
+        run: |
+          # Generate secure password meeting Azure requirements
+          PASSWORD=$(openssl rand -base64 16)
+          SPECIAL_CHAR='!@#$%^&*'
+          RANDOM_SPECIAL=${SPECIAL_CHAR:$((RANDOM % ${#SPECIAL_CHAR})):1}
+          VM_PASSWORD="${PASSWORD}${RANDOM_SPECIAL}Aa1"
           
-      #     # Add password to tfvars file
-      #     echo "virtual_machine_admin_password = \"${VM_PASSWORD}\"" >> terraform.auto.tfvars
-      #     echo "" >> terraform.auto.tfvars
+          # Add password to tfvars file
+          echo "virtual_machine_admin_password = \"${VM_PASSWORD}\"" >> terraform.auto.tfvars
+          echo "" >> terraform.auto.tfvars
       
       - name: Update Terraform Variables
         run: |
           echo "subscription_id = \"${{ secrets.SUBSCRIPTION_ID }}\"" >> terraform.auto.tfvars
           echo "" >> terraform.auto.tfvars
       
-      # - name: Create SSH Key File
-      #   run: |
+      - name: Create SSH Key File
+        run: |
           
-      #     # Create public key file from secret
-      #     echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
-      #     echo "" >> terraform.auto.tfvars
+          # Create public key file from secret
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+          echo "" >> terraform.auto.tfvars
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
