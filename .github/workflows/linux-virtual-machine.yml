@@ -21,7 +21,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       
       - name: 'Az CLI login'
         uses: azure/login@v1
@@ -52,7 +52,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: 'Az CLI login'
         uses: azure/login@v1
@@ -62,7 +62,7 @@ jobs:
           subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v2
 
       - name: Update Terraform Variables - Admin Password
         run: |
@@ -101,7 +101,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       
       - name: 'Az CLI login'
         uses: azure/login@v1
@@ -111,7 +111,7 @@ jobs:
           subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
       
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Initialize 
         run: terraform init
