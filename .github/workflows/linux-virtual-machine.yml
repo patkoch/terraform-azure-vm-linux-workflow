@@ -129,15 +129,38 @@ jobs:
       - name: Check if the storage account exists
         run: az storage account show --name stdemodevwesteu001 --resource-group azureworkshop-demo-rg
       
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v3
-        with:
-          tflint_version: latest
-
-      - name: Run TFLint
+      - name: Verify Required Secrets
         run: |
-          tflint --init
-          tflint --format=compact
+          missing_secrets=()
+          
+          if [ -z "${{ secrets.CLIENT_ID }}" ]; then
+            missing_secrets+=("CLIENT_ID")
+          fi
+          
+          if [ -z "${{ secrets.SSH_PUBLIC_KEY }}" ]; then
+            missing_secrets+=("SSH_PUBLIC_KEY")
+          fi
+          
+          if [ -z "${{ secrets.SUBSCRIPTION_ID }}" ]; then
+            missing_secrets+=("SUBSCRIPTION_ID")
+          fi
+          
+          if [ -z "${{ secrets.TENANT_ID }}" ]; then
+            missing_secrets+=("TENANT_ID")
+          fi
+          
+          if [ -z "${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}" ]; then
+            missing_secrets+=("VIRTUAL_MACHINE_ADMIN_PASSWORD")
+          fi
+          
+          if [ ${#missing_secrets[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets: ${missing_secrets[*]}"
+            echo "Please add the missing secrets in your repository settings:"
+            echo "Settings -> Secrets and variables -> Actions -> New repository secret"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are configured"
 
   deploy:
     if: github.event.inputs.action == 'deploy'
@@ -157,6 +180,16 @@ jobs:
           tenant-id: ${{ secrets.TENANT_ID }}
           subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: latest
+
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint --format=compact
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
 
@@ -175,6 +208,11 @@ jobs:
           
           # Create public key file from secret
           echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+      
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt 
+        continue-on-error: false
 
       - name: Terraform Initialize 
         run: terraform init
