@@ -55,17 +55,17 @@ variable "storage_image_reference_offer" {
 
 variable "storage_image_reference_sku" {
   description = "The SKU of the image to use for the virtual machine."
-  type        = string 
+  type        = string
 }
 
 variable "storage_image_reference_version" {
   description = "The version of the image to use for the virtual machine."
-  type        = string 
+  type        = string
 }
 
 variable "storage_image_reference_publisher" {
   description = "The publisher of the image to use for the virtual machine."
-  type        = string  
+  type        = string
 }
 
 variable "virtual_machine_admin_password" {
