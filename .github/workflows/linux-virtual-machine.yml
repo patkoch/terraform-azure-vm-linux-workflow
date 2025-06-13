@@ -44,15 +44,22 @@ jobs:
         with:
           tflint_version: latest
 
-      - name: Update Terraform Variables - Admin Password
+      - name: Update Terraform Variables
         run: |
-          echo "virtual_machine_admin_password  = \"${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}\"" >> terraform.auto.tfvars
-          echo "" >> terraform.auto.tfvars
+          cat << EOF >> terraform.auto.tfvars
+          subscription_id                  = "${{ secrets.SUBSCRIPTION_ID }}"
+          virtual_machine_admin_password   = "${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}"
+          EOF
+
+      # - name: Update Terraform Variables - Admin Password
+      #   run: |
+      #     echo "virtual_machine_admin_password  = \"${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}\"" >> terraform.auto.tfvars
+      #     echo "" >> terraform.auto.tfvars
       
-      - name: Update Terraform Variables - Subscription ID
-        run: |
-          echo "subscription_id = \"${{ secrets.SUBSCRIPTION_ID }}\"" >> terraform.auto.tfvars
-          echo "" >> terraform.auto.tfvars
+      # - name: Update Terraform Variables - Subscription ID
+      #   run: |
+      #     echo "subscription_id = \"${{ secrets.SUBSCRIPTION_ID }}\"" >> terraform.auto.tfvars
+      #     echo "" >> terraform.auto.tfvars
       
       - name: Create Public SSH Key File
         run: |
