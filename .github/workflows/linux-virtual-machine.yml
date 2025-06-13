@@ -44,12 +44,17 @@ jobs:
         with:
           tflint_version: latest
 
-      - name: Update Terraform Variables
+      - name: Set Terraform Environment Variables
         run: |
-          cat << EOF >> terraform.auto.tfvars
-          subscription_id                  = "${{ secrets.SUBSCRIPTION_ID }}"
-          virtual_machine_admin_password   = "${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}"
-          EOF
+          echo "TF_VAR_subscription_id=${{ secrets.SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_virtual_machine_admin_password=${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}" >> $GITHUB_ENV
+
+      # - name: Update Terraform Variables
+      #   run: |
+      #     cat << EOF >> terraform.auto.tfvars
+      #     subscription_id                  = "${{ secrets.SUBSCRIPTION_ID }}"
+      #     virtual_machine_admin_password   = "${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}"
+      #     EOF
 
       # - name: Update Terraform Variables - Admin Password
       #   run: |
