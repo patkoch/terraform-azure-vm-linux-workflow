@@ -178,6 +178,17 @@ jobs:
           tenant-id: ${{ secrets.TENANT_ID }}
           subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
+      - name: Set Terraform Environment Variables
+        run: |
+          echo "TF_VAR_subscription_id=${{ secrets.SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_virtual_machine_admin_password=${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}" >> $GITHUB_ENV
+      
+      - name: Create Public SSH Key File
+        run: |
+          
+          # Create public key file from secret
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v3
         with:
@@ -214,9 +225,6 @@ jobs:
           path: tfplan
           retention-days: 1
 
-      # - name: Terraform Apply
-      #   run: terraform apply -auto-approve tfplan
-
   apply:
     needs: deploy-plan
     runs-on: ubuntu-latest
@@ -239,13 +247,7 @@ jobs:
           client-id: ${{ secrets.CLIENT_ID }}
           tenant-id: ${{ secrets.TENANT_ID }}
           subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-
-      - name: Terraform Init
-        run: terraform init
-
+      
       - name: Set Terraform Environment Variables
         run: |
           echo "TF_VAR_subscription_id=${{ secrets.SUBSCRIPTION_ID }}" >> $GITHUB_ENV
@@ -256,6 +258,12 @@ jobs:
           
           # Create public key file from secret
           echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
