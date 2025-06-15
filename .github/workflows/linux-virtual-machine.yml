@@ -267,6 +267,7 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+        timeout-minutes: 10
 
   destroy:
     if: github.event.inputs.action == 'destroy'
@@ -304,3 +305,4 @@ jobs:
       
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
+        timeout-minutes: 10
