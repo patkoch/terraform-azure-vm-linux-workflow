@@ -58,12 +58,12 @@ jobs:
         run: |
           tflint --init
           tflint --format=compact
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Terraform Format Check
         id: fmt
         run: terraform fmt -check -recursive
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Terraform Init
         id: init
