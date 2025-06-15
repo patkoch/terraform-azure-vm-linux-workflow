@@ -72,12 +72,13 @@ jobs:
       - name: Terraform Validate
         id: validate
         run: terraform validate
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Terraform Plan
         id: plan
+        timeout-minutes: 10
         run: terraform plan -no-color
-        continue-on-error: true
+        continue-on-error: false
       
       - name: Update Pull Request
         uses: actions/github-script@v6
@@ -159,7 +160,7 @@ jobs:
           
           echo "✅ All required secrets are configured"
 
-  deploy:
+  deploy-plan:
     if: github.event.inputs.action == 'deploy'
     needs: verification
     runs-on: ubuntu-latest
@@ -214,10 +215,59 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
+        timeout-minutes: 10
         run: terraform plan -out=tfplan
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+          retention-days: 1
+
+  apply:
+    needs: deploy-plan
+    runs-on: ubuntu-latest
+    environment: production  # This enables manual approval
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+
+      - name: 'Az CLI login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+      
+      - name: Set Terraform Environment Variables
+        run: |
+          echo "TF_VAR_subscription_id=${{ secrets.SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_virtual_machine_admin_password=${{ secrets.VIRTUAL_MACHINE_ADMIN_PASSWORD }}" >> $GITHUB_ENV
+      
+      - name: Create Public SSH Key File
+        run: |
+          
+          # Create public key file from secret
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+        timeout-minutes: 10
 
   destroy:
     if: github.event.inputs.action == 'destroy'
@@ -255,3 +305,4 @@ jobs:
       
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
+        timeout-minutes: 10
