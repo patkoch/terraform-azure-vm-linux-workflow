@@ -18,10 +18,10 @@ variable "vnet_name" {
   type        = string
 }
 
-# variable "subnet_name" {
-#   description = "The name of the subnet within the virtual network."
-#   type        = string
-# }
+variable "subnet_name" {
+  description = "The name of the subnet within the virtual network."
+  type        = string
+}
 
 variable "public_ip_name" {
   description = "The name of the public IP address."
