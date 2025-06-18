@@ -25,7 +25,7 @@ variable "subnet_name" {
 
 variable "public_ip_name" {
   description = "The name of the public IP address."
-  type        = string
+  # type        = string
 }
 
 variable "network_interface_name" {
