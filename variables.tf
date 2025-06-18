@@ -20,7 +20,7 @@ variable "vnet_name" {
 
 variable "subnet_name" {
   description = "The name of the subnet within the virtual network."
-  type        = string
+  #type        = string
 }
 
 variable "public_ip_name" {
