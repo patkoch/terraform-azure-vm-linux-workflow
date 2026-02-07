@@ -97,9 +97,16 @@ jobs:
           
           if [ "$has_issues" = true ]; then
             echo "issues_found=true" >> $GITHUB_OUTPUT
+            # write a human-readable summary file and expose as output
+            printf '%b' "${issues}" > issues_summary.txt
             echo "issues_summary<<EOF" >> $GITHUB_OUTPUT
             echo "${issues}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
+
+            # print summary to the job log for easy visibility
+            echo "----- Detected Issues Summary -----"
+            printf '%b' "${issues}"
+            echo "-----------------------------------"
           else
             echo "issues_found=false" >> $GITHUB_OUTPUT
             echo "issues_summary=No issues detected" >> $GITHUB_OUTPUT
@@ -113,6 +120,7 @@ jobs:
           path: |
             validate_output.json
             tflint_output.json
+            issues_summary.txt
           retention-days: 7
 
   code-agent-fix:
