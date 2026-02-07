@@ -227,24 +227,7 @@ jobs:
               repo,
               head: '${{ env.BRANCH_NAME }}',
               base: '${{ github.ref_name }}',
-              body: `## 🤖 Self-Healing Pipeline - Automated Fixes
-
-### Issues Detected and Fixed:
-${{ needs.detect-and-fix.outputs.issues_summary }}
-
-### Changes Made:
-- ✅ Fixed Terraform formatting issues
-- ✅ Validated Terraform configuration
-- ✅ Applied security and best practice recommendations
-- ✅ Verified variable definitions and descriptions
-
-### Next Steps:
-1. Review the changes in this PR
-2. Merge if everything looks good
-3. The automated test will verify all fixes
-
----
-*This PR was automatically created by the Self-Healing Pipeline. Please review and approve to merge.*`,
+              body: '## 🤖 Self-Healing Pipeline - Automated Fixes\n\n### Issues Detected and Fixed:\n${{ needs.detect-and-fix.outputs.issues_summary }}\n\n### Changes Made:\n- ✅ Fixed Terraform formatting issues\n- ✅ Validated Terraform configuration\n- ✅ Applied security and best practice recommendations\n- ✅ Verified variable definitions and descriptions\n\n### Next Steps:\n1. Review the changes in this PR\n2. Merge if everything looks good\n3. The automated test will verify all fixes\n\n---\n*This PR was automatically created by the Self-Healing Pipeline. Please review and approve to merge.*',
               labels: ['🤖 automated', 'terraform', 'self-healing']
             });
             
