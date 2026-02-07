@@ -182,30 +182,65 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            
-            // Log detected issues
+            const { execSync } = require('child_process');
+
             console.log('🔍 Self-Healing Pipeline initiated');
             console.log('📋 Issues detected:');
             console.log(`${{ needs.detect-and-fix.outputs.issues_summary }}`);
-            
-            // Perform automated fixes
-            const { execSync } = require('child_process');
-            
-            // Check and fix common Terraform issues
+
             console.log('\n🔧 Applying automated fixes...');
-            
+
+            let changesMade = [];
+
             try {
-              // Fix 1: Ensure all resources have required tags
-              console.log('✓ Checking resource tags...');
-              
-              // Fix 2: Validate variable defaults
-              console.log('✓ Validating variable definitions...');
-              
-              // Fix 3: Check for missing descriptions
-              console.log('✓ Checking for missing descriptions...');
-              
-            } catch (error) {
-              console.error('Error during fix application:', error);
+              // Auto-fix: undeclared input variables -> append variable block to variables.tf
+              if (fs.existsSync('validate_output.json')) {
+                const validate = JSON.parse(fs.readFileSync('validate_output.json', 'utf8'));
+                if (Array.isArray(validate.diagnostics)) {
+                  for (const d of validate.diagnostics) {
+                    if (d.summary && d.summary.includes('Reference to undeclared input variable')) {
+                      // try to extract variable name from detail or snippet
+                      let name = null;
+                      if (d.detail) {
+                        const m = d.detail.match(/name \\\"?([a-zA-Z0-9_]+)\\\"?/);
+                        if (m) name = m[1];
+                      }
+                      if (!name && d.snippet && d.snippet.code) {
+                        const m2 = d.snippet.code.match(/var\.([a-zA-Z0-9_]+)/);
+                        if (m2) name = m2[1];
+                      }
+
+                      if (name) {
+                        const varsPath = 'variables.tf';
+                        let varsContent = '';
+                        if (fs.existsSync(varsPath)) varsContent = fs.readFileSync(varsPath, 'utf8');
+
+                        const varDeclRegex = new RegExp(`variable\\s+\\"${name}\\"`);
+                        if (!varDeclRegex.test(varsContent)) {
+                          const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
+                          fs.appendFileSync(varsPath, block, 'utf8');
+                          execSync(`git add ${varsPath}`);
+                          changesMade.push(`Added variable declaration for \"${name}\" to ${varsPath}`);
+                          console.log(`➕ Added variable \"${name}\" to ${varsPath}`);
+                        } else {
+                          console.log(`ℹ️ Variable \"${name}\" already declared; skipping.`);
+                        }
+                      } else {
+                        console.log('⚠️ Could not determine variable name from diagnostic:', d);
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error applying automated fixes:', err);
+            }
+
+            if (changesMade.length > 0) {
+              console.log('\n✅ Automated fixes staged:');
+              for (const c of changesMade) console.log('- ' + c);
+            } else {
+              console.log('\nℹ️ No automated fixes applied.');
             }
 
       - name: Validate Fixed Code
