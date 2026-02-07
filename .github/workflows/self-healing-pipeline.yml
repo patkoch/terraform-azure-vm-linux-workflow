@@ -214,7 +214,13 @@ jobs:
       - name: Commit and Push Fixes
         if: steps.fmt_fix.outputs.formatting_fixed == 'true' || success()
         run: |
-          git add .
+          # Clean up large files and temporary files
+          rm -rf .terraform/
+          rm -f id_rsa.pub
+          
+          # Add only the Terraform configuration files
+          git add *.tf terraform.auto.tfvars 2>/dev/null || true
+          
           if ! git diff-index --quiet HEAD --; then
             git commit -m "🤖 fix: Auto-fix Terraform configuration issues
 
