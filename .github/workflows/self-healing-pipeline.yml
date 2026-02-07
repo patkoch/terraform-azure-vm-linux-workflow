@@ -40,8 +40,7 @@ jobs:
           git fetch origin +refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }} || true
           git checkout ${{ github.ref_name }} || true
           git pull origin ${{ github.ref_name }} || true
-        with:
-          fetch-depth: 0
+        # no 'with' here; this is a shell step that runs git commands
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
