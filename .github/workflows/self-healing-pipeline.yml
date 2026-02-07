@@ -146,6 +146,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: analysis-results
+          path: .
+
       - name: Create branch for fixes
         run: |
           git config --local user.email "action@github.com"
@@ -202,7 +208,7 @@ jobs:
                       // try to extract variable name from detail or snippet
                       let name = null;
                       if (d.detail) {
-                        const m = d.detail.match(/name \\\"?([a-zA-Z0-9_]+)\\\"?/);
+                        const m = d.detail.match(/name\s+"?([a-zA-Z0-9_]+)"?/);
                         if (m) name = m[1];
                       }
                       if (!name && d.snippet && d.snippet.code) {
