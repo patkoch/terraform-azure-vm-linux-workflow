@@ -13,7 +13,7 @@ variable "resource_group_location" {
   type        = string
 }
 
-variable "vnet_name" {
+variable "vne_name" {
   description = "The name of the virtual network."
   type        = string
 }
