@@ -238,19 +238,7 @@ jobs:
               owner,
               repo,
               issue_number: pullRequest.data.number,
-              body: `### 🔍 Detailed Analysis
-              
-**Scan Results:**
-- Terraform Validation: ✅
-- TFLint Analysis: 🔍
-- Formatting Check: ✅
-
-**Automated Fixes Applied:**
-1. Code formatting standardization
-2. Configuration validation
-3. Best practice alignment
-
-Please review and approve this PR to merge the fixes.`
+              body: '### 🔍 Detailed Analysis\n\n**Scan Results:**\n- Terraform Validation: ✅\n- TFLint Analysis: 🔍\n- Formatting Check: ✅\n\n**Automated Fixes Applied:**\n1. Code formatting standardization\n2. Configuration validation\n3. Best practice alignment\n\nPlease review and approve this PR to merge the fixes.'
             });
 
   test-fixes:
