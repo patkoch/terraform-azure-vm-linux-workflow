@@ -201,8 +201,26 @@ jobs:
             try {
               // Auto-fix: undeclared input variables -> append variable block to variables.tf
               if (fs.existsSync('validate_output.json')) {
-                const validate = JSON.parse(fs.readFileSync('validate_output.json', 'utf8'));
-                if (Array.isArray(validate.diagnostics)) {
+                let validate = null;
+                try {
+                  const raw = fs.readFileSync('validate_output.json', 'utf8');
+                  const first = raw.indexOf('{');
+                  const last = raw.lastIndexOf('}');
+                  if (first !== -1 && last !== -1 && last >= first) {
+                    const jsonStr = raw.slice(first, last + 1);
+                    validate = JSON.parse(jsonStr);
+                  } else {
+                    console.log('⚠️ validate_output.json does not contain a clear JSON object. Raw content:');
+                    console.log(raw);
+                  }
+                } catch (parseErr) {
+                  console.error('Failed to parse validate_output.json:', parseErr);
+                  console.log('--- Begin validate_output.json raw ---');
+                  console.log(fs.readFileSync('validate_output.json', 'utf8'));
+                  console.log('--- End validate_output.json raw ---');
+                }
+
+                if (validate && Array.isArray(validate.diagnostics)) {
                   for (const d of validate.diagnostics) {
                     if (d.summary && d.summary.includes('Reference to undeclared input variable')) {
                       // try to extract variable name from detail or snippet
