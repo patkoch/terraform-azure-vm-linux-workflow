@@ -79,3 +79,7 @@ variable "virtual_machine_ssh_key_path" {
   default     = "id_rsa.pub"
   description = "Path to the public key"
 }
+variable "vnet_name" {
+  description = "Auto-added by Self-Healing Pipeline — please set a value."
+  type = string
+}
