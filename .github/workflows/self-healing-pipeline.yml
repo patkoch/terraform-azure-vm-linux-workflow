@@ -74,25 +74,27 @@ jobs:
           
           # Check formatting issues
           if [ "$FORMATTING_ISSUES" = "true" ]; then
-            issues="${issues}1. Terraform formatting issues detected\n"
+            issues="${issues}1. Terraform formatting issues detected"$'\n'
             has_issues=true
           fi
           
           # Check validation errors
           if grep -q "error" validate_output.json 2>/dev/null; then
-            issues="${issues}2. Terraform validation errors detected\n"
+            issues="${issues}2. Terraform validation errors detected"$'\n'
             has_issues=true
           fi
           
           # Check TFLint warnings/errors
           if [ -s tflint_output.json ] && grep -q "error\|warning" tflint_output.json 2>/dev/null; then
-            issues="${issues}3. TFLint violations detected\n"
+            issues="${issues}3. TFLint violations detected"$'\n'
             has_issues=true
           fi
           
           if [ "$has_issues" = true ]; then
             echo "issues_found=true" >> $GITHUB_OUTPUT
-            echo -e "issues_summary=${issues}" >> $GITHUB_OUTPUT
+            echo "issues_summary<<EOF" >> $GITHUB_OUTPUT
+            echo "${issues}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
             echo "issues_found=false" >> $GITHUB_OUTPUT
             echo "issues_summary=No issues detected" >> $GITHUB_OUTPUT
