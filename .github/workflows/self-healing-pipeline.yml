@@ -261,15 +261,53 @@ jobs:
                         let varsContent = '';
                         if (fs.existsSync(varsPath)) varsContent = fs.readFileSync(varsPath, 'utf8');
 
-                        const varDeclRegex = new RegExp(`variable\\s+\\"${name}\\"`);
-                        if (!varDeclRegex.test(varsContent)) {
-                          const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
-                          fs.appendFileSync(varsPath, block, 'utf8');
-                          execSync(`git add ${varsPath}`);
-                          changesMade.push(`Added variable declaration for \"${name}\" to ${varsPath}`);
-                          console.log(`➕ Added variable \"${name}\" to ${varsPath}`);
+                        // regex to detect an existing (uncommented) variable declaration
+                        const varDeclRegex = new RegExp(`variable\\s+"${name}"`);
+                        if (varDeclRegex.test(varsContent)) {
+                          console.log(`ℹ️ Variable "${name}" already declared; skipping.`);
                         } else {
-                          console.log(`ℹ️ Variable \"${name}\" already declared; skipping.`);
+                          // try to find a commented variable block and uncomment it
+                          const lines = varsContent.split(/\r?\n/);
+                          let start = -1;
+                          for (let i = 0; i < lines.length; i++) {
+                            if (new RegExp(`^[ \t]*#[ \t]*variable\\s+"${name}"`).test(lines[i])) {
+                              start = i;
+                              break;
+                            }
+                          }
+
+                          if (start !== -1) {
+                            // find end of block (first line after start containing a closing brace '}' )
+                            let end = -1;
+                            for (let j = start; j < lines.length; j++) {
+                              if (lines[j].includes('}')) { end = j; break; }
+                            }
+                            if (end !== -1) {
+                              for (let k = start; k <= end; k++) {
+                                // remove leading comment markers
+                                lines[k] = lines[k].replace(/^[ \t]*#[ \t]?/, '');
+                              }
+                              const newContent = lines.join('\n');
+                              fs.writeFileSync(varsPath, newContent, 'utf8');
+                              execSync(`git add ${varsPath}`);
+                              changesMade.push(`Uncommented variable declaration for "${name}" in ${varsPath}`);
+                              console.log(`✳️ Uncommented variable "${name}" in ${varsPath}`);
+                            } else {
+                              console.log(`⚠️ Found commented variable start for "${name}" but could not find block end; will append a new declaration.`);
+                              const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
+                              fs.appendFileSync(varsPath, block, 'utf8');
+                              execSync(`git add ${varsPath}`);
+                              changesMade.push(`Added variable declaration for "${name}" to ${varsPath}`);
+                              console.log(`➕ Added variable "${name}" to ${varsPath}`);
+                            }
+                          } else {
+                            // no commented block found — append a new variable declaration
+                            const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
+                            fs.appendFileSync(varsPath, block, 'utf8');
+                            execSync(`git add ${varsPath}`);
+                            changesMade.push(`Added variable declaration for "${name}" to ${varsPath}`);
+                            console.log(`➕ Added variable "${name}" to ${varsPath}`);
+                          }
                         }
                       } else {
                         console.log('⚠️ Could not determine variable name from diagnostic:', d);
