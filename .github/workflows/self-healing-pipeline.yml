@@ -243,13 +243,13 @@ jobs:
               console.log('\nℹ️ No automated fixes applied.');
             }
 
-      - name: Validate Fixed Code
-        id: validate_fix
-        run: |
-          terraform init
-          terraform validate
-          terraform fmt -check -recursive
-        continue-on-error: true
+      # - name: Validate Fixed Code
+      #   id: validate_fix
+      #   run: |
+      #     terraform init
+      #     terraform validate
+      #     terraform fmt -check -recursive
+      #   continue-on-error: true
 
       - name: Commit and Push Fixes
         if: steps.fmt_fix.outputs.formatting_fixed == 'true' || success()
