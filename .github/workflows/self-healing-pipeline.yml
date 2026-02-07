@@ -156,10 +156,6 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Invoke GitHub Code Agent for Analysis
-        uses: github/codeql-action/database-create@v3
-        continue-on-error: true
-
       - name: Use GitHub Agent to Analyze and Fix Issues
         uses: actions/github-script@v7
         with:
@@ -255,6 +251,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: 'Az CLI login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
