@@ -261,8 +261,8 @@ jobs:
                         let varsContent = '';
                         if (fs.existsSync(varsPath)) varsContent = fs.readFileSync(varsPath, 'utf8');
 
-                        // regex to detect an existing (uncommented) variable declaration
-                        const varDeclRegex = new RegExp(`variable\\s+"${name}"`);
+                        // regex to detect an existing (uncommented) variable declaration (match at line start, multiline)
+                        const varDeclRegex = new RegExp(`^\\s*variable\\s+"${name}"`, 'm');
                         if (varDeclRegex.test(varsContent)) {
                           console.log(`ℹ️ Variable "${name}" already declared; skipping.`);
                         } else {
