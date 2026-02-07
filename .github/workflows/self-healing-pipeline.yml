@@ -35,13 +35,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update branch to latest (ensure merged PR is included)
-        run: |
-          git fetch origin +refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }} || true
-          git checkout ${{ github.ref_name }} || true
-          git pull origin ${{ github.ref_name }} || true
-        # no 'with' here; this is a shell step that runs git commands
-
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
 
@@ -286,6 +279,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Update branch to latest (ensure merged PR is included)
+        run: |
+          git fetch origin +refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }} || true
+          git checkout ${{ github.ref_name }} || true
+          git pull origin ${{ github.ref_name }} || true
+        # no 'with' here; this is a shell step that runs git commands
 
       - name: 'Az CLI login'
         uses: azure/login@v1
