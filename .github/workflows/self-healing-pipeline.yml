@@ -238,15 +238,18 @@ jobs:
       - name: Create Pull Request with Fixes
         if: env.CHANGES_PUSHED == 'true'
         uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.SELF_HEALING_TOKEN }}
         with:
+          github-token: ${{ secrets.SELF_HEALING_TOKEN }}
           script: |
             const { repo, owner } = context.repo;
             const issues = `${{ needs.detect-and-fix.outputs.issues_summary }}`.replace(/"/g, '\\"');
             
             const pullRequest = await github.rest.pulls.create({
-              title: '🤖 fix: Self-Healing - Automated Terraform Configuration Fixes',
               owner,
               repo,
+              title: '🤖 fix: Self-Healing - Automated Terraform Configuration Fixes',
               head: '${{ env.BRANCH_NAME }}',
               base: '${{ github.ref_name }}',
               body: `## 🤖 Self-Healing Pipeline - Automated Fixes\n\n### Issues Detected and Fixed:\n${issues}\n\n### Changes Made:\n- ✅ Fixed Terraform formatting issues\n- ✅ Validated Terraform configuration\n- ✅ Applied security and best practice recommendations\n- ✅ Verified variable definitions and descriptions\n\n### Next Steps:\n1. Review the changes in this PR\n2. Merge if everything looks good\n3. The automated test will verify all fixes\n\n---\n*This PR was automatically created by the Self-Healing Pipeline. Please review and approve to merge.*`,
