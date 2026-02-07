@@ -7,6 +7,7 @@ on:
       - 'feature/**'
   schedule:
     # Run daily to detect and fix issues
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 permissions:
