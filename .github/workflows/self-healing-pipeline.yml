@@ -270,6 +270,8 @@ jobs:
     needs: [detect-and-fix, code-agent-fix]
     if: always()
     runs-on: ubuntu-latest
+    environment:
+      name: terraform-approval
     permissions:
       id-token: write
       contents: read
