@@ -13,10 +13,10 @@ variable "resource_group_location" {
   type        = string
 }
 
-# variable "vnet_name" {
-#  description = "The name of the virtual network."
-#  type        = string
-# }
+variable "vnet_name" {
+  description = "The name of the virtual network."
+  type        = string
+}
 
 variable "subnet_name" {
   description = "The name of the subnet within the virtual network."
