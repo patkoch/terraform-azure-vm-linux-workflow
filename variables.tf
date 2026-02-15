@@ -10,7 +10,7 @@ variable "resource_group_name" {
 
 variable "resource_group_location" {
   description = "The Azure region where the resource group will be created."
-  type            = string
+  type        = string
 }
 
 variable "vnet_name" {
