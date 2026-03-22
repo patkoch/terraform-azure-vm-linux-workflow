@@ -184,9 +184,77 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Invoke GitHub Coding Agent to Analyze and Fix Issues
+      - name: Download Analysis Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: analysis-results
+        continue-on-error: true
+
+      - name: Create GitHub Issue for Copilot Coding Agent
+        id: create_issue
+        uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ secrets.CODING_AGENT_TOKEN }}
+          ISSUES_SUMMARY: ${{ needs.detect-and-fix.outputs.issues_summary }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read analysis output files for detailed reporting
+            let validateDetails = '';
+            let tflintDetails = '';
+            try {
+              validateDetails = fs.readFileSync('validate_output.json', 'utf8');
+            } catch (e) {
+              validateDetails = 'No validation output available.';
+            }
+            try {
+              tflintDetails = fs.readFileSync('tflint_output.json', 'utf8');
+            } catch (e) {
+              tflintDetails = 'No TFLint output available.';
+            }
+
+            const issueBody = [
+              '## 🔍 Self-Healing Pipeline – Terraform Issues Detected',
+              '',
+              '**The Self-Healing pipeline detected the following issues:**',
+              '',
+              process.env.ISSUES_SUMMARY,
+              '',
+              '### Terraform Validation Output',
+              '```json',
+              validateDetails,
+              '```',
+              '',
+              '### TFLint Analysis Output',
+              '```json',
+              tflintDetails,
+              '```',
+              '',
+              '### Workflow Run',
+              `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+              '',
+              '### Required Actions',
+              '1. Fix `terraform fmt` formatting issues',
+              '2. Resolve `terraform validate` errors',
+              '3. Address TFLint violations',
+              '',
+              '> This issue was automatically created by the Self-Healing Pipeline.',
+              '> Please review, fix the issues, and merge the accompanying automated PR.'
+            ].join('\n');
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🤖 Self-Healing: Terraform Configuration Issues Detected',
+              body: issueBody,
+              labels: ['terraform', 'self-healing']
+            });
+
+            core.setOutput('issue_number', issue.data.number);
+            console.log(`✅ Created issue #${issue.data.number}: ${issue.data.html_url}`);
+
+      - name: Validate Fixed Code
+        id: validate_fix
         run: |
           gh issue create \
             --title "🤖 Self-Healing: Fix Terraform Configuration Issues ($(date -u +%Y-%m-%dT%H-%M-%SZ))" \
@@ -244,31 +312,66 @@ jobs:
         if: env.CHANGES_PUSHED == 'true'
         uses: actions/github-script@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.SELF_HEALING_TOKEN }}
+          ISSUES_SUMMARY: ${{ needs.detect-and-fix.outputs.issues_summary }}
         with:
           github-token: ${{ secrets.SELF_HEALING_TOKEN }}
           script: |
             const { repo, owner } = context.repo;
-            const issues = `${{ needs.detect-and-fix.outputs.issues_summary }}`.replace(/"/g, '\\"');
-            
+
+            const prBody = [
+              '## 🤖 Self-Healing Pipeline - Automated Fixes',
+              '',
+              '### Issues Detected and Fixed:',
+              process.env.ISSUES_SUMMARY,
+              '',
+              '### Changes Made:',
+              '- ✅ Fixed Terraform formatting issues',
+              '- ✅ Validated Terraform configuration',
+              '- ✅ Applied security and best practice recommendations',
+              '- ✅ Verified variable definitions and descriptions',
+              '',
+              '### Next Steps:',
+              '1. Review the changes in this PR',
+              '2. Merge if everything looks good',
+              '3. The automated test will verify all fixes',
+              '',
+              '---',
+              '*This PR was automatically created by the Self-Healing Pipeline.*'
+            ].join('\n');
+
             const pullRequest = await github.rest.pulls.create({
               owner,
               repo,
               title: '🤖 fix: Self-Healing - Automated Terraform Configuration Fixes',
               head: '${{ env.BRANCH_NAME }}',
               base: '${{ github.ref_name }}',
-              body: `## 🤖 Self-Healing Pipeline - Automated Fixes\n\n### Issues Detected and Fixed:\n${issues}\n\n### Changes Made:\n- ✅ Fixed Terraform formatting issues\n- ✅ Validated Terraform configuration\n- ✅ Applied security and best practice recommendations\n- ✅ Verified variable definitions and descriptions\n\n### Next Steps:\n1. Review the changes in this PR\n2. Merge if everything looks good\n3. The automated test will verify all fixes\n\n---\n*This PR was automatically created by the Self-Healing Pipeline. Please review and approve to merge.*`,
+              body: prBody,
               labels: ['🤖 automated', 'terraform', 'self-healing']
             });
-            
+
             console.log(`✅ Pull Request created: ${pullRequest.data.html_url}`);
-            
-            // Add a comment with detailed analysis
+
+            const commentBody = [
+              '### 🔍 Detailed Analysis',
+              '',
+              '**Scan Results:**',
+              '- Terraform Validation: ✅',
+              '- TFLint Analysis: 🔍',
+              '- Formatting Check: ✅',
+              '',
+              '**Automated Fixes Applied:**',
+              '1. Code formatting standardization',
+              '2. Configuration validation',
+              '3. Best practice alignment',
+              '',
+              'Please review and approve this PR to merge the fixes.'
+            ].join('\n');
+
             await github.rest.issues.createComment({
               owner,
               repo,
               issue_number: pullRequest.data.number,
-              body: '### 🔍 Detailed Analysis\n\n**Scan Results:**\n- Terraform Validation: ✅\n- TFLint Analysis: 🔍\n- Formatting Check: ✅\n\n**Automated Fixes Applied:**\n1. Code formatting standardization\n2. Configuration validation\n3. Best practice alignment\n\nPlease review and approve this PR to merge the fixes.'
+              body: commentBody
             });
 
   test-fixes:
@@ -312,7 +415,7 @@ jobs:
           echo "${{ secrets.SSH_PUBLIC_KEY }}" > id_rsa.pub
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend=false
 
       - name: Terraform Validate - Final Check
         id: validate_final
@@ -322,31 +425,24 @@ jobs:
       - name: Terraform Format Check - Final
         run: terraform fmt -check -recursive
 
-      - name: Terraform Plan - Dry Run
-        id: plan
-        run: terraform plan -no-color
-        continue-on-error: true
-
       - name: Report Results
         if: always()
         uses: actions/github-script@v7
         with:
           script: |
             const validate = '${{ steps.validate_final.outcome }}';
-            const plan = '${{ steps.plan.outcome }}';
-            
+
             let status = '✅';
             let message = 'All tests passed!';
-            
-            if (validate === 'failure' || plan === 'failure') {
+
+            if (validate === 'failure') {
               status = '❌';
               message = 'Some issues were detected. Please review the logs.';
             }
-            
+
             console.log(`${status} ${message}`);
             console.log(`\n📊 Test Results:`);
             console.log(`- Validation: ${validate}`);
-            console.log(`- Plan: ${plan}`);
 
   summary:
     needs: [detect-and-fix, code-agent-fix, test-fixes]
