@@ -186,7 +186,7 @@ jobs:
 
       - name: Invoke GitHub Coding Agent to Analyze and Fix Issues
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CODING_AGENT_TOKEN }}
         run: |
           gh issue create \
             --title "🤖 Self-Healing: Fix Terraform Configuration Issues ($(date -u +%Y-%m-%dT%H-%M-%SZ))" \
