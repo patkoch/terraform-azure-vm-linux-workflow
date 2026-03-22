@@ -5,8 +5,6 @@ on:
     branches:
       - main
       - 'feature/**'
-  schedule:
-    - cron: '0 0 * * *'  # Run daily at midnight UTC
   workflow_dispatch:
 
 permissions:
@@ -20,8 +18,16 @@ jobs:
     outputs:
       issues_found: ${{ steps.detect.outputs.issues_found }}
       issues_summary: ${{ steps.detect.outputs.issues_summary }}
+
     steps:
-      - name: Checkout repository
+      - name: 'Az CLI login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
+      - name: Checkout repository (fetch full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -73,25 +79,34 @@ jobs:
           
           # Check formatting issues
           if [ "$FORMATTING_ISSUES" = "true" ]; then
-            issues="${issues}1. Terraform formatting issues detected\n"
+            issues="${issues}1. Terraform formatting issues detected"$'\n'
             has_issues=true
           fi
           
           # Check validation errors
           if grep -q "error" validate_output.json 2>/dev/null; then
-            issues="${issues}2. Terraform validation errors detected\n"
+            issues="${issues}2. Terraform validation errors detected"$'\n'
             has_issues=true
           fi
           
           # Check TFLint warnings/errors
           if [ -s tflint_output.json ] && grep -q "error\|warning" tflint_output.json 2>/dev/null; then
-            issues="${issues}3. TFLint violations detected\n"
+            issues="${issues}3. TFLint violations detected"$'\n'
             has_issues=true
           fi
           
           if [ "$has_issues" = true ]; then
             echo "issues_found=true" >> $GITHUB_OUTPUT
-            echo -e "issues_summary=${issues}" >> $GITHUB_OUTPUT
+            # write a human-readable summary file and expose as output
+            printf '%b' "${issues}" > issues_summary.txt
+            echo "issues_summary<<EOF" >> $GITHUB_OUTPUT
+            echo "${issues}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+
+            # print summary to the job log for easy visibility
+            echo "----- Detected Issues Summary -----"
+            printf '%b' "${issues}"
+            echo "-----------------------------------"
           else
             echo "issues_found=false" >> $GITHUB_OUTPUT
             echo "issues_summary=No issues detected" >> $GITHUB_OUTPUT
@@ -105,6 +120,7 @@ jobs:
           path: |
             validate_output.json
             tflint_output.json
+            issues_summary.txt
           retention-days: 7
 
   code-agent-fix:
@@ -115,12 +131,27 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      issues: write
     
     steps:
+
+      - name: 'Az CLI login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: analysis-results
+          path: .
 
       - name: Create branch for fixes
         run: |
@@ -225,15 +256,44 @@ jobs:
       - name: Validate Fixed Code
         id: validate_fix
         run: |
-          terraform init
-          terraform validate
-          terraform fmt -check -recursive
-        continue-on-error: true
+          gh issue create \
+            --title "🤖 Self-Healing: Fix Terraform Configuration Issues ($(date -u +%Y-%m-%dT%H-%M-%SZ))" \
+            --body "## 🔍 Self-Healing Pipeline – Automated Fix Request
+
+          ### Issues Detected:
+          ${{ needs.detect-and-fix.outputs.issues_summary }}
+
+          ### Fix Instructions:
+          Please analyze the Terraform configuration files (\`*.tf\`) in this repository and fix all detected issues:
+
+          1. Run \`terraform fmt -recursive\` to correct any formatting violations.
+          2. Run \`terraform validate\` to resolve any configuration errors.
+          3. Review the TFLint output and apply the recommended fixes.
+          4. Ensure variable blocks include \`description\` attributes and sensible \`default\` values where appropriate.
+          5. Commit the fixes to branch \`$BRANCH_NAME\` and open a pull request against \`${{ github.ref_name }}\`.
+
+          ---
+          *This issue was automatically created by the Self-Healing Pipeline (run ${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC').*" \
+            --assignee "@copilot"
+
+      # - name: Validate Fixed Code
+      #   id: validate_fix
+      #   run: |
+      #     terraform init
+      #     terraform validate
+      #     terraform fmt -check -recursive
+      #   continue-on-error: true
 
       - name: Commit and Push Fixes
         if: steps.fmt_fix.outputs.formatting_fixed == 'true' || success()
         run: |
-          git add .
+          # Clean up large files and temporary files
+          rm -rf .terraform/
+          rm -f id_rsa.pub
+          
+          # Add only the Terraform configuration files
+          git add *.tf terraform.auto.tfvars 2>/dev/null || true
+          
           if ! git diff-index --quiet HEAD --; then
             git commit -m "🤖 fix: Auto-fix Terraform configuration issues
 
@@ -254,6 +314,7 @@ jobs:
         env:
           ISSUES_SUMMARY: ${{ needs.detect-and-fix.outputs.issues_summary }}
         with:
+          github-token: ${{ secrets.SELF_HEALING_TOKEN }}
           script: |
             const { repo, owner } = context.repo;
 
@@ -279,9 +340,9 @@ jobs:
             ].join('\n');
 
             const pullRequest = await github.rest.pulls.create({
-              title: '🤖 fix: Self-Healing - Automated Terraform Configuration Fixes',
               owner,
               repo,
+              title: '🤖 fix: Self-Healing - Automated Terraform Configuration Fixes',
               head: '${{ env.BRANCH_NAME }}',
               base: '${{ github.ref_name }}',
               body: prBody,
@@ -317,6 +378,8 @@ jobs:
     needs: [detect-and-fix, code-agent-fix]
     if: always()
     runs-on: ubuntu-latest
+    environment:
+      name: terraform-approval
     permissions:
       id-token: write
       contents: read
@@ -324,6 +387,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Update branch to latest (ensure merged PR is included)
+        run: |
+          git fetch origin +refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }} || true
+          git checkout ${{ github.ref_name }} || true
+          git pull origin ${{ github.ref_name }} || true
+        # no 'with' here; this is a shell step that runs git commands
+
+      - name: 'Az CLI login'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.SUBSCRIPTION_ID }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
