@@ -131,6 +131,7 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      issues: write
     
     steps:
 
@@ -183,149 +184,29 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Use GitHub Agent to Analyze and Fix Issues
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const { execSync } = require('child_process');
+      - name: Invoke GitHub Coding Agent to Analyze and Fix Issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🤖 Self-Healing: Fix Terraform Configuration Issues ($(date -u +%Y-%m-%dT%H-%M-%SZ))" \
+            --body "## 🔍 Self-Healing Pipeline – Automated Fix Request
 
-            console.log('🔍 Self-Healing Pipeline initiated');
-            console.log('📋 Issues detected:');
-            console.log(`${{ needs.detect-and-fix.outputs.issues_summary }}`);
+          ### Issues Detected:
+          ${{ needs.detect-and-fix.outputs.issues_summary }}
 
-            console.log('\n🔧 Applying automated fixes...');
+          ### Fix Instructions:
+          Please analyze the Terraform configuration files (\`*.tf\`) in this repository and fix all detected issues:
 
-            let changesMade = [];
+          1. Run \`terraform fmt -recursive\` to correct any formatting violations.
+          2. Run \`terraform validate\` to resolve any configuration errors.
+          3. Review the TFLint output and apply the recommended fixes.
+          4. Ensure variable blocks include \`description\` attributes and sensible \`default\` values where appropriate.
+          5. Commit the fixes to branch \`$BRANCH_NAME\` and open a pull request against \`${{ github.ref_name }}\`.
 
-            try {
-              // Auto-fix: undeclared input variables -> append variable block to variables.tf
-              if (fs.existsSync('validate_output.json')) {
-                let validate = null;
-                try {
-                  const raw = fs.readFileSync('validate_output.json', 'utf8');
-                  const first = raw.indexOf('{');
-                  if (first !== -1) {
-                    // find matching closing brace by tracking depth
-                    let depth = 0;
-                    let end = -1;
-                    for (let i = first; i < raw.length; i++) {
-                      const ch = raw[i];
-                      if (ch === '{') depth++;
-                      else if (ch === '}') {
-                        depth--;
-                        if (depth === 0) { end = i; break; }
-                      }
-                    }
-                    if (end !== -1) {
-                      const jsonStr = raw.slice(first, end + 1);
-                      try {
-                        validate = JSON.parse(jsonStr);
-                      } catch (e) {
-                        console.error('JSON.parse failed on extracted substring:', e);
-                        console.log('--- Extracted substring ---');
-                        console.log(jsonStr);
-                        console.log('--- End extracted substring ---');
-                      }
-                    } else {
-                      console.log('⚠️ Could not find matching closing brace for JSON. Raw content:');
-                      console.log(raw);
-                    }
-                  } else {
-                    console.log('⚠️ validate_output.json does not contain "{". Raw content:');
-                    console.log(raw);
-                  }
-                } catch (parseErr) {
-                  console.error('Failed to parse validate_output.json:', parseErr);
-                  console.log('--- Begin validate_output.json raw ---');
-                  console.log(fs.readFileSync('validate_output.json', 'utf8'));
-                  console.log('--- End validate_output.json raw ---');
-                }
-
-                if (validate && Array.isArray(validate.diagnostics)) {
-                  for (const d of validate.diagnostics) {
-                    if (d.summary && d.summary.includes('Reference to undeclared input variable')) {
-                      // try to extract variable name from detail or snippet
-                      let name = null;
-                      if (d.detail) {
-                        const m = d.detail.match(/name\s+"?([a-zA-Z0-9_]+)"?/);
-                        if (m) name = m[1];
-                      }
-                      if (!name && d.snippet && d.snippet.code) {
-                        const m2 = d.snippet.code.match(/var\.([a-zA-Z0-9_]+)/);
-                        if (m2) name = m2[1];
-                      }
-
-                      if (name) {
-                        const varsPath = 'variables.tf';
-                        let varsContent = '';
-                        if (fs.existsSync(varsPath)) varsContent = fs.readFileSync(varsPath, 'utf8');
-
-                        // regex to detect an existing (uncommented) variable declaration (match at line start, multiline)
-                        const varDeclRegex = new RegExp(`^\\s*variable\\s+"${name}"`, 'm');
-                        if (varDeclRegex.test(varsContent)) {
-                          console.log(`ℹ️ Variable "${name}" already declared; skipping.`);
-                        } else {
-                          // try to find a commented variable block and uncomment it
-                          const lines = varsContent.split(/\r?\n/);
-                          let start = -1;
-                          for (let i = 0; i < lines.length; i++) {
-                            if (new RegExp(`^[ \t]*#[ \t]*variable\\s+"${name}"`).test(lines[i])) {
-                              start = i;
-                              break;
-                            }
-                          }
-
-                          if (start !== -1) {
-                            // find end of block (first line after start containing a closing brace '}' )
-                            let end = -1;
-                            for (let j = start; j < lines.length; j++) {
-                              if (lines[j].includes('}')) { end = j; break; }
-                            }
-                            if (end !== -1) {
-                              for (let k = start; k <= end; k++) {
-                                // remove leading comment markers
-                                lines[k] = lines[k].replace(/^[ \t]*#[ \t]?/, '');
-                              }
-                              const newContent = lines.join('\n');
-                              fs.writeFileSync(varsPath, newContent, 'utf8');
-                              execSync(`git add ${varsPath}`);
-                              changesMade.push(`Uncommented variable declaration for "${name}" in ${varsPath}`);
-                              console.log(`✳️ Uncommented variable "${name}" in ${varsPath}`);
-                            } else {
-                              console.log(`⚠️ Found commented variable start for "${name}" but could not find block end; will append a new declaration.`);
-                              const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
-                              fs.appendFileSync(varsPath, block, 'utf8');
-                              execSync(`git add ${varsPath}`);
-                              changesMade.push(`Added variable declaration for "${name}" to ${varsPath}`);
-                              console.log(`➕ Added variable "${name}" to ${varsPath}`);
-                            }
-                          } else {
-                            // no commented block found — append a new variable declaration
-                            const block = `\nvariable "${name}" {\n  description = "Auto-added by Self-Healing Pipeline — please set a value."\n  type = string\n}\n`;
-                            fs.appendFileSync(varsPath, block, 'utf8');
-                            execSync(`git add ${varsPath}`);
-                            changesMade.push(`Added variable declaration for "${name}" to ${varsPath}`);
-                            console.log(`➕ Added variable "${name}" to ${varsPath}`);
-                          }
-                        }
-                      } else {
-                        console.log('⚠️ Could not determine variable name from diagnostic:', d);
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('Error applying automated fixes:', err);
-            }
-
-            if (changesMade.length > 0) {
-              console.log('\n✅ Automated fixes staged:');
-              for (const c of changesMade) console.log('- ' + c);
-            } else {
-              console.log('\nℹ️ No automated fixes applied.');
-            }
+          ---
+          *This issue was automatically created by the Self-Healing Pipeline (run ${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC').*" \
+            --assignee "@copilot"
 
       # - name: Validate Fixed Code
       #   id: validate_fix
