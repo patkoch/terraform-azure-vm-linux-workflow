@@ -115,6 +115,7 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      issues: write
     
     steps:
       - name: Checkout repository
@@ -153,40 +154,29 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Invoke GitHub Code Agent for Analysis
-        uses: github/codeql-action/database-create@v3
-        continue-on-error: true
+      - name: Invoke GitHub Coding Agent to Analyze and Fix Issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🤖 Self-Healing: Fix Terraform Configuration Issues ($(date -u +%Y-%m-%dT%H-%M-%SZ))" \
+            --body "## 🔍 Self-Healing Pipeline – Automated Fix Request
 
-      - name: Use GitHub Agent to Analyze and Fix Issues
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            
-            // Log detected issues
-            console.log('🔍 Self-Healing Pipeline initiated');
-            console.log('📋 Issues detected:');
-            console.log(`${{ needs.detect-and-fix.outputs.issues_summary }}`);
-            
-            // Perform automated fixes
-            const { execSync } = require('child_process');
-            
-            // Check and fix common Terraform issues
-            console.log('\n🔧 Applying automated fixes...');
-            
-            try {
-              // Fix 1: Ensure all resources have required tags
-              console.log('✓ Checking resource tags...');
-              
-              // Fix 2: Validate variable defaults
-              console.log('✓ Validating variable definitions...');
-              
-              // Fix 3: Check for missing descriptions
-              console.log('✓ Checking for missing descriptions...');
-              
-            } catch (error) {
-              console.error('Error during fix application:', error);
-            }
+          ### Issues Detected:
+          ${{ needs.detect-and-fix.outputs.issues_summary }}
+
+          ### Fix Instructions:
+          Please analyze the Terraform configuration files (\`*.tf\`) in this repository and fix all detected issues:
+
+          1. Run \`terraform fmt -recursive\` to correct any formatting violations.
+          2. Run \`terraform validate\` to resolve any configuration errors.
+          3. Review the TFLint output and apply the recommended fixes.
+          4. Ensure variable blocks include \`description\` attributes and sensible \`default\` values where appropriate.
+          5. Commit the fixes to branch \`$BRANCH_NAME\` and open a pull request against \`${{ github.ref_name }}\`.
+
+          ---
+          *This issue was automatically created by the Self-Healing Pipeline (run ${{ github.run_id }}) on $(date -u '+%Y-%m-%d %H:%M UTC').*" \
+            --assignee "@copilot"
 
       - name: Validate Fixed Code
         id: validate_fix
